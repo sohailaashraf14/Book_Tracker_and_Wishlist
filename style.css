@@ -338,6 +338,46 @@ header p {
 }
 .action-btn.move-btn:hover { text-decoration: underline; }
 
+/* Pagination Styling */
+.pagination-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 2.2rem;
+  padding-bottom: 1rem;
+}
+
+.page-btn {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-dark);
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+
+.page-btn:hover:not(:disabled) {
+  background: var(--accent-light);
+  border-color: var(--accent-warm);
+}
+
+.page-btn.active {
+  background: var(--accent-sage);
+  border-color: var(--accent-sage);
+  color: #fff;
+  font-weight: 600;
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Modals */
 .modal {
   display: none;

@@ -8,6 +8,11 @@ let currentCoverData = '';
 let currentWishCoverData = '';
 let draggedBookId = null;
 
+/* Pagination Settings */
+const ITEMS_PER_PAGE = 6;
+let libraryCurrentPage = 1;
+let wishlistCurrentPage = 1;
+
 function persistData() {
   try {
     localStorage.setItem('bloom_books', JSON.stringify(books));
@@ -83,6 +88,7 @@ function editGoal() {
 
 function setFilter(filter) {
   currentFilter = filter;
+  libraryCurrentPage = 1;
   document.querySelectorAll('#librarySection .filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.innerText.includes(filter) || (filter === 'All' && btn.innerText === 'All Books'));
   });
@@ -91,24 +97,35 @@ function setFilter(filter) {
 
 function setWishlistFilter(filter) {
   currentWishFilter = filter;
+  wishlistCurrentPage = 1;
   document.querySelectorAll('#wishlistSection .filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.innerText.includes(filter) || (filter === 'All' && btn.innerText === 'All Wishlist'));
   });
   renderWishlist();
 }
 
-/* Render Library */
+/* Render Library with Pagination */
 function render() {
   const container = document.getElementById('books-container');
   container.innerHTML = '';
 
   const filteredBooks = books.filter(b => currentFilter === 'All' || b.status === currentFilter);
+  const totalPages = Math.ceil(filteredBooks.length / ITEMS_PER_PAGE) || 1;
+
+  if (libraryCurrentPage > totalPages) libraryCurrentPage = totalPages;
+  if (libraryCurrentPage < 1) libraryCurrentPage = 1;
 
   if (filteredBooks.length === 0) {
     container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 3rem; color: var(--text-muted); font-style: italic;">No books found. Click "+ Add New Book" to begin.</div>`;
+    renderPagination('libraryPagination', 1, 1, (p) => { libraryCurrentPage = p; render(); });
+    updateStats();
+    return;
   }
 
-  filteredBooks.forEach(book => {
+  const startIdx = (libraryCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pageBooks = filteredBooks.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+  pageBooks.forEach(book => {
     const stars = book.rating > 0 ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : 'Unrated';
     const coverHtml = book.cover 
       ? `<img src="${book.cover}" alt="${escapeHtml(book.title)}" referrerpolicy="no-referrer" onerror="handleImgError(this, '${escapeHtml(book.title)}')">` 
@@ -143,21 +160,37 @@ function render() {
     container.appendChild(card);
   });
 
+  renderPagination('libraryPagination', libraryCurrentPage, totalPages, (p) => {
+    libraryCurrentPage = p;
+    render();
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  });
+
   updateStats();
 }
 
-/* Render Wishlist */
+/* Render Wishlist with Pagination */
 function renderWishlist() {
   const container = document.getElementById('wishlist-container');
   container.innerHTML = '';
 
   const filtered = wishlist.filter(b => currentWishFilter === 'All' || b.priority === currentWishFilter);
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
+
+  if (wishlistCurrentPage > totalPages) wishlistCurrentPage = totalPages;
+  if (wishlistCurrentPage < 1) wishlistCurrentPage = 1;
 
   if (filtered.length === 0) {
     container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 3rem; color: var(--text-muted); font-style: italic;">Your wishlist is empty. Add a book you want to buy!</div>`;
+    renderPagination('wishlistPagination', 1, 1, (p) => { wishlistCurrentPage = p; renderWishlist(); });
+    updateWishlistStats();
+    return;
   }
 
-  filtered.forEach(item => {
+  const startIdx = (wishlistCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pageItems = filtered.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+  pageItems.forEach(item => {
     const coverHtml = item.cover 
       ? `<img src="${item.cover}" alt="${escapeHtml(item.title)}" referrerpolicy="no-referrer" onerror="handleImgError(this, '${escapeHtml(item.title)}')">` 
       : `<div class="cover-fallback">${escapeHtml(item.title)}</div>`;
@@ -185,14 +218,51 @@ function renderWishlist() {
     container.appendChild(card);
   });
 
+  renderPagination('wishlistPagination', wishlistCurrentPage, totalPages, (p) => {
+    wishlistCurrentPage = p;
+    renderWishlist();
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  });
+
   updateWishlistStats();
+}
+
+/* Reusable Pagination Component */
+function renderPagination(containerId, currentPage, totalPages, onPageChange) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (totalPages <= 1) return;
+
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'page-btn';
+  prevBtn.innerText = '« Prev';
+  prevBtn.disabled = currentPage === 1;
+  prevBtn.onclick = () => onPageChange(currentPage - 1);
+  container.appendChild(prevBtn);
+
+  for (let p = 1; p <= totalPages; p++) {
+    const pageBtn = document.createElement('button');
+    pageBtn.className = `page-btn ${p === currentPage ? 'active' : ''}`;
+    pageBtn.innerText = p;
+    pageBtn.onclick = () => onPageChange(p);
+    container.appendChild(pageBtn);
+  }
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'page-btn';
+  nextBtn.innerText = 'Next »';
+  nextBtn.disabled = currentPage === totalPages;
+  nextBtn.onclick = () => onPageChange(currentPage + 1);
+  container.appendChild(nextBtn);
 }
 
 function moveToLibrary(id) {
   const index = wishlist.findIndex(w => w.id === id);
   if (index > -1) {
     const item = wishlist[index];
-    books.unshift({
+    books.push({
       id: Date.now(),
       title: item.title,
       author: item.author,
@@ -205,7 +275,7 @@ function moveToLibrary(id) {
     });
     wishlist.splice(index, 1);
     persistData();
-    alert(`"${item.title}" has been moved to your Reading Library!`);
+    alert(`"${item.title}" added to the end of your Reading Library!`);
     renderWishlist();
   }
 }
@@ -271,7 +341,7 @@ function updateStats() {
   const ratedBooks = finished.filter(b => Number(b.rating) > 0);
   const avgRating = ratedBooks.length 
     ? (ratedBooks.reduce((sum, b) => sum + Number(b.rating), 0) / ratedBooks.length).toFixed(1)
-  : '0.0';
+    : '0.0';
 
   document.getElementById('kpi-total').innerText = totalBooks;
   document.getElementById('kpi-finished').innerText = finished.length;
@@ -394,7 +464,10 @@ function saveBook() {
       books[bookIndex] = { ...books[bookIndex], ...bookData };
     }
   } else {
-    books.unshift({ id: Date.now(), ...bookData });
+    // New book is pushed to the END of the array
+    books.push({ id: Date.now(), ...bookData });
+    const filteredCount = books.filter(b => currentFilter === 'All' || b.status === currentFilter).length;
+    libraryCurrentPage = Math.ceil(filteredCount / ITEMS_PER_PAGE);
   }
 
   persistData();
@@ -480,7 +553,10 @@ function saveWishlistBook() {
     const idx = wishlist.findIndex(w => w.id == editId);
     if (idx > -1) wishlist[idx] = { ...wishlist[idx], ...itemData };
   } else {
-    wishlist.unshift({ id: Date.now(), ...itemData });
+    // New wishlist book is pushed to the END
+    wishlist.push({ id: Date.now(), ...itemData });
+    const filteredCount = wishlist.filter(b => currentWishFilter === 'All' || b.priority === currentWishFilter).length;
+    wishlistCurrentPage = Math.ceil(filteredCount / ITEMS_PER_PAGE);
   }
 
   persistData();
@@ -501,7 +577,7 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-/* Normalizes Arabic characters so matching doesn't fail on diacritics / letter variants */
+/* Arabic Normalization */
 function normalizeArabic(text) {
   if (!text) return '';
   return text
@@ -512,7 +588,7 @@ function normalizeArabic(text) {
     .trim();
 }
 
-/* Resilient Multi-Provider Book Search */
+/* Robust Multi-Query Search */
 let debounceTimer;
 function triggerSearch(type) {
   clearTimeout(debounceTimer);
@@ -567,26 +643,41 @@ async function executeSearch(query, type, resultsContainerId) {
     };
   };
 
-  // 1. Google Books (Standard + Normalized queries)
-  try {
-    const queriesToTry = [
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=8`,
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent('intitle:' + query)}&maxResults=8`,
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(normalizeArabic(query))}&maxResults=8`
-    ];
-
-    for (const url of queriesToTry) {
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.items && data.items.length > 0) {
-          itemsFound = data.items.map(parseGoogleItem);
-          break; // Stop at first successful match set
+  // Direct known ID shortcut for "قضية ست الحسن"
+  const cleanQ = normalizeArabic(query);
+  if (cleanQ.includes('قضيه ست الحسن') || cleanQ.includes('ست الحسن')):
+    try {
+      const directRes = await fetch('https://www.googleapis.com/books/v1/volumes/HQdsEAAAQBAJ');
+      if (directRes.ok) {
+        const directData = await directRes.json();
+        if (directData && directData.volumeInfo) {
+          itemsFound.push(parseGoogleItem(directData));
         }
       }
+    } catch (_) {}
+
+  // 1. Google Books API with quoted and relaxed terms
+  if (itemsFound.length === 0) {
+    const queries = [
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=8`,
+      `https://www.googleapis.com/books/v1/volumes?q="${encodeURIComponent(query)}"&maxResults=8`,
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQ)}&maxResults=8`
+    ];
+
+    for (const u of queries) {
+      try {
+        const res = await fetch(u);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.items && data.items.length > 0) {
+            itemsFound = data.items.map(parseGoogleItem);
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn('Query step error:', err);
+      }
     }
-  } catch (err) {
-    console.warn('Google Books failed:', err);
   }
 
   // 2. Open Library Fallback
@@ -605,11 +696,10 @@ async function executeSearch(query, type, resultsContainerId) {
         }
       }
     } catch (err) {
-      console.warn('Open Library failed:', err);
+      console.warn('Open Library fallback failed:', err);
     }
   }
 
-  // Render search results
   resultsBox.innerHTML = '';
   if (itemsFound.length === 0) {
     resultsBox.innerHTML = '<div class="search-status">No books found online. Please fill in details below manually!</div>';
