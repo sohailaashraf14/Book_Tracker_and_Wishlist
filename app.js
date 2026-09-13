@@ -1,21 +1,8 @@
 let currentMode = 'library';
-let readingGoal = Number(localStorage.getItem('bloom_goal')) || 25;
+let readingGoal = 25;
+let books = [];
+let wishlist = [];
 
-// Safe parser to ensure existing data always loads
-function getStoredArray(key) {
-  try {
-    let item = localStorage.getItem(key);
-    if (!item) return [];
-    let parsed = JSON.parse(item);
-    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-let books = getStoredArray('bloom_books');
-let wishlist = getStoredArray('bloom_wishlist');
 let currentFilter = 'All';
 let currentWishFilter = 'All';
 let currentCoverData = '';
@@ -26,15 +13,88 @@ const ITEMS_PER_PAGE = 6;
 let libraryCurrentPage = 1;
 let wishlistCurrentPage = 1;
 
+/* -------------------------------------------------------------
+   INITIALIZATION & CACHING PIPELINE
+------------------------------------------------------------- */
+
+function loadStorageArray(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    let parsed = JSON.parse(raw);
+    while (typeof parsed === 'string') {
+      parsed = JSON.parse(parsed);
+    }
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (e) {
+    console.error("Storage load error:", e);
+    return null;
+  }
+}
+
+async function initializeApp() {
+  const localBooks = loadStorageArray('bloom_books');
+  const localWish = loadStorageArray('bloom_wishlist');
+  const localGoal = localStorage.getItem('bloom_goal');
+
+  if (localBooks && localBooks.length > 0) {
+    books = localBooks;
+    wishlist = localWish || [];
+    readingGoal = Number(localGoal) || 25;
+  } else {
+    try {
+      const res = await fetch('books-data.json', { cache: 'no-cache' });
+      if (res.ok) {
+        const remoteData = await res.json();
+        books = remoteData.books || [];
+        wishlist = remoteData.wishlist || [];
+        readingGoal = Number(remoteData.goal) || 25;
+        persistData();
+      }
+    } catch (err) {
+      console.warn("Could not load books-data.json:", err);
+      books = [];
+      wishlist = [];
+    }
+  }
+
+  render();
+  renderWishlist();
+  updateStats();
+  updateWishlistStats();
+}
+
 function persistData() {
   try {
     localStorage.setItem('bloom_books', JSON.stringify(books));
     localStorage.setItem('bloom_wishlist', JSON.stringify(wishlist));
     localStorage.setItem('bloom_goal', readingGoal);
   } catch (e) {
-    alert("Storage limit reached! Please use image URLs rather than large file uploads.");
+    alert("Local storage limit reached. Please use online image URLs.");
   }
 }
+
+/* -------------------------------------------------------------
+   DIRECT JSON EXPORTER (UPDATES YOUR REPO SOURCE)
+------------------------------------------------------------- */
+
+function downloadUpdatedJson() {
+  const payload = {
+    goal: readingGoal,
+    books: books,
+    wishlist: wishlist
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'books-data.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* -------------------------------------------------------------
+   IMAGE COMPRESSION & PREVIEW
+------------------------------------------------------------- */
 
 function handleFileUpload(e, type) {
   const file = e.target.files[0];
@@ -77,6 +137,29 @@ function handleFileUpload(e, type) {
   reader.readAsDataURL(file);
 }
 
+function updatePreview(url, boxId) {
+  if (boxId === 'previewBox') currentCoverData = url;
+  else currentWishCoverData = url;
+
+  const box = document.getElementById(boxId);
+  if (!box) return;
+
+  if (url) {
+    box.innerHTML = `<img src="${url}" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML='<span>Failed</span>'">`;
+  } else {
+    box.innerHTML = '<span>No image</span>';
+  }
+}
+
+function handleImgError(imgElement, title) {
+  imgElement.onerror = null;
+  imgElement.parentElement.innerHTML = `<div class="cover-fallback">${title}</div>`;
+}
+
+/* -------------------------------------------------------------
+   NAVIGATION & FILTERS
+------------------------------------------------------------- */
+
 function switchMode(mode) {
   currentMode = mode;
   document.getElementById('librarySection').style.display = (mode === 'library') ? 'block' : 'none';
@@ -116,8 +199,13 @@ function setWishlistFilter(filter) {
   renderWishlist();
 }
 
+/* -------------------------------------------------------------
+   RENDERING & PAGINATION
+------------------------------------------------------------- */
+
 function render() {
   const container = document.getElementById('books-container');
+  if (!container) return;
   container.innerHTML = '';
 
   const filteredBooks = books.filter(b => currentFilter === 'All' || b.status === currentFilter);
@@ -156,7 +244,7 @@ function render() {
         <div class="book-author">by ${escapeHtml(book.author)}</div>
         <div class="book-details-list">
           <span>${book.pages || 0} pages</span>
-          <span>${book.format}</span>
+          <span>${book.format || 'Physical'}</span>
         </div>
         <div class="book-rating">${stars}</div>
         ${book.review ? `<p class="book-review">"${escapeHtml(book.review)}"</p>` : ''}
@@ -182,6 +270,7 @@ function render() {
 
 function renderWishlist() {
   const container = document.getElementById('wishlist-container');
+  if (!container) return;
   container.innerHTML = '';
 
   const filtered = wishlist.filter(b => currentWishFilter === 'All' || b.priority === currentWishFilter);
@@ -267,27 +356,9 @@ function renderPagination(containerId, currentPage, totalPages, onPageChange) {
   container.appendChild(nextBtn);
 }
 
-function moveToLibrary(id) {
-  const index = wishlist.findIndex(w => w.id === id);
-  if (index > -1) {
-    const item = wishlist[index];
-    books.push({
-      id: Date.now(),
-      title: item.title,
-      author: item.author,
-      status: 'To-Read',
-      pages: 0,
-      format: 'Physical',
-      rating: 0,
-      cover: item.cover,
-      review: item.notes ? `Purchased from wishlist: ${item.notes}` : ''
-    });
-    wishlist.splice(index, 1);
-    persistData();
-    alert(`"${item.title}" added to the end of your Reading Library!`);
-    renderWishlist();
-  }
-}
+/* -------------------------------------------------------------
+   DRAG & DROP REORDERING
+------------------------------------------------------------- */
 
 function addDragEvents(card) {
   card.addEventListener('dragstart', (e) => {
@@ -335,10 +406,9 @@ function reorderBooks(sourceId, targetId) {
   }
 }
 
-function handleImgError(imgElement, title) {
-  imgElement.onerror = null;
-  imgElement.parentElement.innerHTML = `<div class="cover-fallback">${title}</div>`;
-}
+/* -------------------------------------------------------------
+   STATS CALCULATION
+------------------------------------------------------------- */
 
 function updateStats() {
   const totalBooks = books.length;
@@ -351,15 +421,22 @@ function updateStats() {
     ? (ratedBooks.reduce((sum, b) => sum + Number(b.rating), 0) / ratedBooks.length).toFixed(1)
     : '0.0';
 
-  document.getElementById('kpi-total').innerText = totalBooks;
-  document.getElementById('kpi-finished').innerText = finished.length;
-  document.getElementById('kpi-pages').innerText = totalPages.toLocaleString();
-  document.getElementById('kpi-rating').innerText = avgRating;
-  document.getElementById('kpi-reading').innerText = reading.length;
+  const totalEl = document.getElementById('kpi-total');
+  if (totalEl) totalEl.innerText = totalBooks;
+  const finEl = document.getElementById('kpi-finished');
+  if (finEl) finEl.innerText = finished.length;
+  const pagesEl = document.getElementById('kpi-pages');
+  if (pagesEl) pagesEl.innerText = totalPages.toLocaleString();
+  const ratEl = document.getElementById('kpi-rating');
+  if (ratEl) ratEl.innerText = avgRating;
+  const readEl = document.getElementById('kpi-reading');
+  if (readEl) readEl.innerText = reading.length;
 
-  document.getElementById('goal-fraction').innerText = `${finished.length} / ${readingGoal} Books`;
+  const fracEl = document.getElementById('goal-fraction');
+  if (fracEl) fracEl.innerText = `${finished.length} / ${readingGoal} Books`;
   const percentage = Math.min(100, Math.round((finished.length / readingGoal) * 100));
-  document.getElementById('goal-progress').style.width = `${percentage}%`;
+  const progEl = document.getElementById('goal-progress');
+  if (progEl) progEl.style.width = `${percentage}%`;
 }
 
 function updateWishlistStats() {
@@ -378,24 +455,21 @@ function updateWishlistStats() {
     .filter(b => b.priority === 'Low')
     .reduce((sum, b) => sum + (Number(b.price) || 0), 0);
 
-  document.getElementById('kpi-wish-count').innerText = totalWish;
-  document.getElementById('kpi-wish-cost').innerText = totalCost.toLocaleString() + ' EGP';
-  document.getElementById('kpi-cost-high').innerText = mustHaveCost.toLocaleString() + ' EGP';
-  document.getElementById('kpi-cost-med').innerText = mediumCost.toLocaleString() + ' EGP';
-  document.getElementById('kpi-cost-low').innerText = niceToHaveCost.toLocaleString() + ' EGP';
+  const countEl = document.getElementById('kpi-wish-count');
+  if (countEl) countEl.innerText = totalWish;
+  const costEl = document.getElementById('kpi-wish-cost');
+  if (costEl) costEl.innerText = totalCost.toLocaleString() + ' EGP';
+  const hiEl = document.getElementById('kpi-cost-high');
+  if (hiEl) hiEl.innerText = mustHaveCost.toLocaleString() + ' EGP';
+  const medEl = document.getElementById('kpi-cost-med');
+  if (medEl) medEl.innerText = mediumCost.toLocaleString() + ' EGP';
+  const lowEl = document.getElementById('kpi-cost-low');
+  if (lowEl) lowEl.innerText = niceToHaveCost.toLocaleString() + ' EGP';
 }
 
-function updatePreview(url, boxId) {
-  if (boxId === 'previewBox') currentCoverData = url;
-  else currentWishCoverData = url;
-
-  const box = document.getElementById(boxId);
-  if (url) {
-    box.innerHTML = `<img src="${url}" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML='<span>Failed</span>'">`;
-  } else {
-    box.innerHTML = '<span>No image</span>';
-  }
-}
+/* -------------------------------------------------------------
+   BOOK OPERATIONS (ADD TO END)
+------------------------------------------------------------- */
 
 function openModal() {
   document.getElementById('modalHeading').innerText = 'Log a New Book';
@@ -415,7 +489,7 @@ function openEditModal(id) {
   document.getElementById('author').value = book.author;
   document.getElementById('status').value = book.status;
   document.getElementById('pages').value = book.pages || '';
-  document.getElementById('format').value = book.format;
+  document.getElementById('format').value = book.format || 'Physical';
   document.getElementById('rating').value = book.rating || 0;
   document.getElementById('review').value = book.review || '';
   
@@ -472,6 +546,7 @@ function saveBook() {
       books[bookIndex] = { ...books[bookIndex], ...bookData };
     }
   } else {
+    // New items are appended to the end of the collection
     books.push({ id: Date.now(), ...bookData });
     const filteredCount = books.filter(b => currentFilter === 'All' || b.status === currentFilter).length;
     libraryCurrentPage = Math.ceil(filteredCount / ITEMS_PER_PAGE);
@@ -489,6 +564,10 @@ function deleteBook(id) {
     render();
   }
 }
+
+/* -------------------------------------------------------------
+   WISHLIST OPERATIONS
+------------------------------------------------------------- */
 
 function openWishlistModal() {
   document.getElementById('wishlistModalHeading').innerText = 'Add to Wishlist';
@@ -577,6 +656,32 @@ function deleteWishlistBook(id) {
     renderWishlist();
   }
 }
+
+function moveToLibrary(id) {
+  const index = wishlist.findIndex(w => w.id === id);
+  if (index > -1) {
+    const item = wishlist[index];
+    books.push({
+      id: Date.now(),
+      title: item.title,
+      author: item.author,
+      status: 'To-Read',
+      pages: 0,
+      format: 'Physical',
+      rating: 0,
+      cover: item.cover,
+      review: item.notes ? `Purchased from wishlist: ${item.notes}` : ''
+    });
+    wishlist.splice(index, 1);
+    persistData();
+    alert(`"${item.title}" added to the end of your Reading Library!`);
+    renderWishlist();
+  }
+}
+
+/* -------------------------------------------------------------
+   SEARCH & UTILITIES
+------------------------------------------------------------- */
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -728,5 +833,5 @@ async function executeSearch(query, type, resultsContainerId) {
   });
 }
 
-// Initial Render
-render();
+// Kick off initialization
+initializeApp();
