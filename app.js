@@ -1,3 +1,10 @@
+/* -------------------------------------------------------------
+   GITHUB REPOSITORY SYNC CONFIGURATION
+------------------------------------------------------------- */
+const GITHUB_OWNER = 'sohailaashraf14'; // e.g., 'octocat'
+const GITHUB_REPO = 'Book_Tracker_and_Wishlist';  // e.g., 'reading-journal'
+const GITHUB_BRANCH = 'main';                // change to 'master' if your repo uses master
+
 let currentMode = 'library';
 let readingGoal = 25;
 let books = [];
@@ -75,21 +82,79 @@ function persistData() {
 }
 
 /* -------------------------------------------------------------
-   DIRECT JSON EXPORTER (UPDATES YOUR REPO SOURCE)
+   GITHUB API COMMITS PIPELINE
 ------------------------------------------------------------- */
 
-function downloadUpdatedJson() {
-  const payload = {
-    goal: readingGoal,
-    books: books,
-    wishlist: wishlist
+function getGitHubToken() {
+  let token = localStorage.getItem('bloom_gh_token');
+  if (!token) {
+    token = prompt("Enter your GitHub Personal Access Token to enable live cloud sync:");
+    if (token) {
+      token = token.trim();
+      localStorage.setItem('bloom_gh_token', token);
+    }
+  }
+  return token;
+}
+
+function utf8ToBase64(str) {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+    return String.fromCharCode('0x' + p1);
+  }));
+}
+
+async function syncToGitHub() {
+  const token = getGitHubToken();
+  if (!token) return;
+
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/books-data.json`;
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/vnd.github+json',
+    'Content-Type': 'application/json'
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'books-data.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
+
+  try {
+    let fileSha = null;
+    const getRes = await fetch(`${url}?ref=${GITHUB_BRANCH}`, { headers });
+    if (getRes.ok) {
+      const fileMeta = await getRes.json();
+      fileSha = fileMeta.sha;
+    }
+
+    const payloadData = {
+      goal: readingGoal,
+      books: books,
+      wishlist: wishlist
+    };
+    const contentBase64 = utf8ToBase64(JSON.stringify(payloadData, null, 2));
+
+    const body = {
+      message: "Sync reading journal data [skip ci]",
+      content: contentBase64,
+      branch: GITHUB_BRANCH
+    };
+    if (fileSha) body.sha = fileSha;
+
+    const putRes = await fetch(url, {
+      method: 'PUT',
+      headers: headers,
+      body: JSON.stringify(body)
+    });
+
+    if (putRes.ok) {
+      console.log("Successfully committed changes to books-data.json on GitHub!");
+    } else {
+      const errData = await putRes.json();
+      console.error("GitHub sync failed:", errData);
+      if (putRes.status === 401) {
+        alert("Invalid token. Please refresh and re-enter your GitHub PAT.");
+        localStorage.removeItem('bloom_gh_token');
+      }
+    }
+  } catch (err) {
+    console.error("Network error syncing to GitHub:", err);
+  }
 }
 
 /* -------------------------------------------------------------
@@ -177,6 +242,7 @@ function editGoal() {
   if (newGoal && !isNaN(newGoal) && Number(newGoal) > 0) {
     readingGoal = parseInt(newGoal, 10);
     persistData();
+    syncToGitHub();
     updateStats();
   }
 }
@@ -402,6 +468,7 @@ function reorderBooks(sourceId, targetId) {
     const [movedBook] = books.splice(sourceIndex, 1);
     books.splice(targetIndex, 0, movedBook);
     persistData();
+    syncToGitHub();
     render();
   }
 }
@@ -546,13 +613,13 @@ function saveBook() {
       books[bookIndex] = { ...books[bookIndex], ...bookData };
     }
   } else {
-    // New items are appended to the end of the collection
     books.push({ id: Date.now(), ...bookData });
     const filteredCount = books.filter(b => currentFilter === 'All' || b.status === currentFilter).length;
     libraryCurrentPage = Math.ceil(filteredCount / ITEMS_PER_PAGE);
   }
 
   persistData();
+  syncToGitHub();
   closeModal();
   render();
 }
@@ -561,6 +628,7 @@ function deleteBook(id) {
   if (confirm('Are you sure you want to remove this book?')) {
     books = books.filter(b => b.id !== id);
     persistData();
+    syncToGitHub();
     render();
   }
 }
@@ -645,6 +713,7 @@ function saveWishlistBook() {
   }
 
   persistData();
+  syncToGitHub();
   closeWishlistModal();
   renderWishlist();
 }
@@ -653,6 +722,7 @@ function deleteWishlistBook(id) {
   if (confirm('Remove this book from your wishlist?')) {
     wishlist = wishlist.filter(w => w.id !== id);
     persistData();
+    syncToGitHub();
     renderWishlist();
   }
 }
@@ -674,6 +744,7 @@ function moveToLibrary(id) {
     });
     wishlist.splice(index, 1);
     persistData();
+    syncToGitHub();
     alert(`"${item.title}" added to the end of your Reading Library!`);
     renderWishlist();
   }
@@ -833,5 +904,5 @@ async function executeSearch(query, type, resultsContainerId) {
   });
 }
 
-// Kick off initialization
+// Start application
 initializeApp();
