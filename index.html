@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bloom Journal & Reading Wishlist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Reading Journal</h1>
+      <p>A quiet place for your reading life</p>
+    </header>
+
+    <!-- Mode Switcher -->
+    <div class="view-switcher">
+      <button class="view-btn active" id="modeLibraryBtn" onclick="switchMode('library')">📚 Library & Log</button>
+      <button class="view-btn" id="modeWishlistBtn" onclick="switchMode('wishlist')">🛍️ Book Wishlist</button>
+    </div>
+
+    <!-- VIEW 1: LIBRARY / READING JOURNAL -->
+    <div id="librarySection">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Total Books</h3>
+          <div class="value" id="kpi-total">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Finished</h3>
+          <div class="value" id="kpi-finished">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Currently Reading</h3>
+          <div class="value" id="kpi-reading">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Pages Read</h3>
+          <div class="value" id="kpi-pages">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Avg Rating</h3>
+          <div class="value" id="kpi-rating">0.0</div>
+        </div>
+      </div>
+
+      <div class="goal-box">
+        <div class="goal-header">
+          <span>Yearly Reading Challenge</span>
+          <div class="goal-target-wrap">
+            <span id="goal-fraction">0 / 25 Books</span>
+            <button class="edit-goal-btn" onclick="editGoal()">✏️ Edit Goal</button>
+          </div>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="goal-progress"></div>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <div class="filter-tabs">
+          <button class="filter-btn active" onclick="setFilter('All')">All Books</button>
+          <button class="filter-btn" onclick="setFilter('Reading')">Reading</button>
+          <button class="filter-btn" onclick="setFilter('Finished')">Finished</button>
+          <button class="filter-btn" onclick="setFilter('To-Read')">To-Read</button>
+          <button class="filter-btn" onclick="setFilter('DNF')">DNF</button>
+        </div>
+        <button class="btn-primary" onclick="openModal()">+ Add New Book</button>
+      </div>
+
+      <div class="books-grid" id="books-container"></div>
+    </div>
+
+    <!-- VIEW 2: BOOK WISHLIST -->
+    <div id="wishlistSection" style="display: none;">
+      <div class="stats-grid">
+        <div class="stat-card wishlist-stat">
+          <h3>Total Wishlist Cost</h3>
+          <div class="value" id="kpi-wish-cost">0 EGP</div>
+        </div>
+        <div class="stat-card stat-must">
+          <h3>🔥 Must-Have Cost</h3>
+          <div class="value" id="kpi-cost-high">0 EGP</div>
+        </div>
+        <div class="stat-card stat-med">
+          <h3>⚡ Medium Cost</h3>
+          <div class="value" id="kpi-cost-med">0 EGP</div>
+        </div>
+        <div class="stat-card stat-nice">
+          <h3>🌿 Nice-to-Have Cost</h3>
+          <div class="value" id="kpi-cost-low">0 EGP</div>
+        </div>
+        <div class="stat-card wishlist-stat">
+          <h3>Total Books</h3>
+          <div class="value" id="kpi-wish-count">0</div>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <div class="filter-tabs">
+          <button class="filter-btn active" onclick="setWishlistFilter('All')">All Wishlist</button>
+          <button class="filter-btn" onclick="setWishlistFilter('High')">🔥 Must-Have</button>
+          <button class="filter-btn" onclick="setWishlistFilter('Medium')">Medium Priority</button>
+          <button class="filter-btn" onclick="setWishlistFilter('Low')">Nice to Have</button>
+        </div>
+        <button class="btn-primary" onclick="openWishlistModal()">+ Add to Wishlist</button>
+      </div>
+
+      <div class="books-grid" id="wishlist-container"></div>
+    </div>
+  </div>
+
+  <!-- Library Modal -->
+  <div class="modal" id="bookModal">
+    <div class="modal-content">
+      <h2 class="modal-title" id="modalHeading">Log a New Book</h2>
+      <input type="hidden" id="editBookId">
+
+      <div class="form-group" id="searchGroup">
+        <label>Lookup Book Online (Autofill)</label>
+        <div class="search-wrapper">
+          <input 
+            type="text" 
+            id="apiSearch" 
+            placeholder="Type Arabic or English title (e.g., قضية ست الحسن)..." 
+            onkeydown="if(event.key==='Enter'){event.preventDefault(); triggerSearch('main');}"
+          >
+          <button type="button" class="search-btn" onclick="triggerSearch('main')">Search</button>
+        </div>
+        <div class="search-results" id="searchResults"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Book Title *</label>
+        <input type="text" id="title" required>
+      </div>
+
+      <div class="form-group">
+        <label>Author *</label>
+        <input type="text" id="author" required>
+      </div>
+
+      <div class="form-group">
+        <label>Status</label>
+        <select id="status">
+          <option value="Reading">Currently Reading</option>
+          <option value="Finished">Finished</option>
+          <option value="To-Read">To-Read</option>
+          <option value="DNF">DNF (Did Not Finish)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Pages</label>
+        <input type="number" id="pages" placeholder="320">
+      </div>
+
+      <div class="form-group">
+        <label>Format</label>
+        <select id="format">
+          <option value="Physical">Physical Book</option>
+          <option value="eBook">eBook / Kindle</option>
+          <option value="Audiobook">Audiobook</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Rating</label>
+        <select id="rating">
+          <option value="0">Not rated</option>
+          <option value="5">★★★★★ (5/5)</option>
+          <option value="4">★★★★☆ (4/5)</option>
+          <option value="3">★★★☆☆ (3/5)</option>
+          <option value="2">★★☆☆☆ (2/5)</option>
+          <option value="1">★☆☆☆☆ (1/5)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Book Cover</label>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.4rem;">
+          <input type="url" id="coverUrl" placeholder="Image URL (https://...)" oninput="updatePreview(this.value, 'previewBox')">
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
+          <input type="file" id="coverFileInput" accept="image/*" onchange="handleFileUpload(event, 'main')" style="font-size: 0.8rem; background: transparent; border: none; padding: 0;">
+        </div>
+        <div class="image-preview-box" id="previewBox">
+          <span>No image</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Thoughts & Notes</label>
+        <textarea id="review" rows="3" placeholder="Quotes, thoughts, or notes..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveBook()">Save Book</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wishlist Modal -->
+  <div class="modal" id="wishlistModal">
+    <div class="modal-content">
+      <h2 class="modal-title" id="wishlistModalHeading">Add to Wishlist</h2>
+      <input type="hidden" id="editWishlistId">
+
+      <div class="form-group">
+        <label>Lookup Book Online (Autofill)</label>
+        <div class="search-wrapper">
+          <input 
+            type="text" 
+            id="wishApiSearch" 
+            placeholder="Search title to buy..." 
+            onkeydown="if(event.key==='Enter'){event.preventDefault(); triggerSearch('wish');}"
+          >
+          <button type="button" class="search-btn" onclick="triggerSearch('wish')">Search</button>
+        </div>
+        <div class="search-results" id="wishSearchResults"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Book Title *</label>
+        <input type="text" id="wishTitle" required>
+      </div>
+
+      <div class="form-group">
+        <label>Author *</label>
+        <input type="text" id="wishAuthor" required>
+      </div>
+
+      <div class="form-group">
+        <label>Priority</label>
+        <select id="wishPriority">
+          <option value="High">🔥 Must-Have</option>
+          <option value="Medium">Medium Priority</option>
+          <option value="Low">Nice to Have</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Estimated Price (EGP)</label>
+        <input type="number" id="wishPrice" placeholder="e.g. 250">
+      </div>
+
+      <div class="form-group">
+        <label>Where to Buy / URL link</label>
+        <input type="url" id="wishLink" placeholder="https://amazon.eg/... or Bookstore link">
+      </div>
+
+      <div class="form-group">
+        <label>Book Cover</label>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.4rem;">
+          <input type="url" id="wishCoverUrl" placeholder="Image URL (https://...)" oninput="updatePreview(this.value, 'wishPreviewBox')">
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
+          <input type="file" id="wishFileInput" accept="image/*" onchange="handleFileUpload(event, 'wish')" style="font-size: 0.8rem; background: transparent; border: none; padding: 0;">
+        </div>
+        <div class="image-preview-box" id="wishPreviewBox">
+          <span>No image</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Notes / Edition</label>
+        <textarea id="wishNotes" rows="2" placeholder="e.g. Paperback edition, publisher details..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeWishlistModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveWishlistBook()">Save to Wishlist</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
