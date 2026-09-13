@@ -40,26 +40,33 @@ function loadStorageArray(key) {
 }
 
 async function initializeApp() {
-  const localBooks = loadStorageArray('bloom_books');
-  const localWish = loadStorageArray('bloom_wishlist');
-  const localGoal = localStorage.getItem('bloom_goal');
+  try {
+    // 1. Force a fresh pull from GitHub with a timestamp parameter to break cache
+    const res = await fetch(`book-data.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (res.ok) {
+      const remoteData = await res.json();
+      books = remoteData.books || [];
+      wishlist = remoteData.wishlist || [];
+      readingGoal = Number(remoteData.goal) || 25;
+      
+      // Keep localStorage in sync as an offline backup
+      persistData();
+    } else {
+      throw new Error(`HTTP error ${res.status}`);
+    }
+  } catch (err) {
+    console.warn("Could not load fresh book-data.json, trying local storage:", err);
+    
+    // Fallback to local storage only if network fetch fails
+    const localBooks = loadStorageArray('bloom_books');
+    const localWish = loadStorageArray('bloom_wishlist');
+    const localGoal = localStorage.getItem('bloom_goal');
 
-  if (localBooks && localBooks.length > 0) {
-    books = localBooks;
-    wishlist = localWish || [];
-    readingGoal = Number(localGoal) || 25;
-  } else {
-    try {
-      const res = await fetch('book-data.json', { cache: 'no-cache' });
-      if (res.ok) {
-        const remoteData = await res.json();
-        books = remoteData.books || [];
-        wishlist = remoteData.wishlist || [];
-        readingGoal = Number(remoteData.goal) || 25;
-        persistData();
-      }
-    } catch (err) {
-      console.warn("Could not load book-data.json:", err);
+    if (localBooks && localBooks.length > 0) {
+      books = localBooks;
+      wishlist = localWish || [];
+      readingGoal = Number(localGoal) || 25;
+    } else {
       books = [];
       wishlist = [];
     }
