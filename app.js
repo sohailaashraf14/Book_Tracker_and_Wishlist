@@ -50,7 +50,7 @@ async function initializeApp() {
     readingGoal = Number(localGoal) || 25;
   } else {
     try {
-      const res = await fetch('books-data.json', { cache: 'no-cache' });
+      const res = await fetch('book-data.json', { cache: 'no-cache' });
       if (res.ok) {
         const remoteData = await res.json();
         books = remoteData.books || [];
@@ -59,7 +59,7 @@ async function initializeApp() {
         persistData();
       }
     } catch (err) {
-      console.warn("Could not load books-data.json:", err);
+      console.warn("Could not load book-data.json:", err);
       books = [];
       wishlist = [];
     }
@@ -107,7 +107,7 @@ async function syncToGitHub() {
   const token = getGitHubToken();
   if (!token) return;
 
-  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/books-data.json`;
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/book-data.json`;
   const headers = {
     'Authorization': `Bearer ${token}`,
     'Accept': 'application/vnd.github+json',
@@ -143,7 +143,7 @@ async function syncToGitHub() {
     });
 
     if (putRes.ok) {
-      console.log("Successfully committed changes to books-data.json on GitHub!");
+      console.log("Successfully committed changes to book-data.json on GitHub!");
     } else {
       const errData = await putRes.json();
       console.error("GitHub sync failed:", errData);
