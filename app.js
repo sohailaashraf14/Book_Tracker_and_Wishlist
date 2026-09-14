@@ -1,9 +1,9 @@
 /* -------------------------------------------------------------
    GITHUB REPOSITORY SYNC CONFIGURATION
 ------------------------------------------------------------- */
-const GITHUB_OWNER = 'sohailaashraf14'; // e.g., 'octocat'
-const GITHUB_REPO = 'Book_Tracker_and_Wishlist';  // e.g., 'reading-journal'
-const GITHUB_BRANCH = 'main';                // change to 'master' if your repo uses master
+const GITHUB_OWNER = 'sohailaashraf14';
+const GITHUB_REPO = 'Book_Tracker_and_Wishlist';
+const GITHUB_BRANCH = 'main';
 
 let currentMode = 'library';
 let readingGoal = 25;
@@ -14,11 +14,49 @@ let currentFilter = 'All';
 let currentWishFilter = 'All';
 let currentCoverData = '';
 let currentWishCoverData = '';
-let draggedBookId = null;
 
 const ITEMS_PER_PAGE = 6;
 let libraryCurrentPage = 1;
 let wishlistCurrentPage = 1;
+
+/* -------------------------------------------------------------
+   URL HASH / STATE PRESERVATION ENGINE
+------------------------------------------------------------- */
+
+function saveStateToHash() {
+  const params = new URLSearchParams();
+  params.set('mode', currentMode);
+  if (currentMode === 'library') {
+    params.set('filter', currentFilter);
+    params.set('page', libraryCurrentPage);
+  } else {
+    params.set('wishFilter', currentWishFilter);
+    params.set('wishPage', wishlistCurrentPage);
+  }
+  history.replaceState(null, '', '#' + params.toString());
+}
+
+function restoreStateFromHash() {
+  const rawHash = window.location.hash.replace(/^#/, '');
+  if (!rawHash) return;
+
+  const params = new URLSearchParams(rawHash);
+  if (params.has('mode')) {
+    currentMode = params.get('mode') === 'wishlist' ? 'wishlist' : 'library';
+  }
+  if (params.has('filter')) {
+    currentFilter = params.get('filter');
+  }
+  if (params.has('page')) {
+    libraryCurrentPage = parseInt(params.get('page'), 10) || 1;
+  }
+  if (params.has('wishFilter')) {
+    currentWishFilter = params.get('wishFilter');
+  }
+  if (params.has('wishPage')) {
+    wishlistCurrentPage = parseInt(params.get('wishPage'), 10) || 1;
+  }
+}
 
 /* -------------------------------------------------------------
    INITIALIZATION & CACHING PIPELINE
@@ -40,24 +78,21 @@ function loadStorageArray(key) {
 }
 
 async function initializeApp() {
+  restoreStateFromHash();
+
   try {
-    // Force a fresh fetch from GitHub Pages with a timestamp to bust the browser cache
     const res = await fetch(`book-data.json?t=${Date.now()}`, { cache: 'no-store' });
     if (res.ok) {
       const remoteData = await res.json();
       books = remoteData.books || [];
       wishlist = remoteData.wishlist || [];
       readingGoal = Number(remoteData.goal) || 25;
-      
-      // Update local storage so it mirrors the fresh file
       persistData();
     } else {
       throw new Error(`HTTP error ${res.status}`);
     }
   } catch (err) {
-    console.warn("Could not load fresh book-data.json, checking local storage:", err);
-    
-    // Fallback to local storage only if offline/network fails
+    console.warn("Using local storage fallback:", err);
     const localBooks = loadStorageArray('bloom_books');
     const localWish = loadStorageArray('bloom_wishlist');
     const localGoal = localStorage.getItem('bloom_goal');
@@ -71,6 +106,19 @@ async function initializeApp() {
       wishlist = [];
     }
   }
+
+  // Update button classes to match current restored mode & filters
+  document.getElementById('librarySection').style.display = (currentMode === 'library') ? 'block' : 'none';
+  document.getElementById('wishlistSection').style.display = (currentMode === 'wishlist') ? 'block' : 'none';
+  document.getElementById('modeLibraryBtn').classList.toggle('active', currentMode === 'library');
+  document.getElementById('modeWishlistBtn').classList.toggle('active', currentMode === 'wishlist');
+
+  document.querySelectorAll('#librarySection .filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.innerText.includes(currentFilter) || (currentFilter === 'All' && btn.innerText === 'All Books'));
+  });
+  document.querySelectorAll('#wishlistSection .filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.innerText.includes(currentWishFilter) || (currentWishFilter === 'All' && btn.innerText === 'All Wishlist'));
+  });
 
   render();
   renderWishlist();
@@ -155,7 +203,7 @@ async function syncToGitHub() {
       const errData = await putRes.json();
       console.error("GitHub sync failed:", errData);
       if (putRes.status === 401) {
-        alert("Invalid token. Please refresh and re-enter your GitHub PAT.");
+        alert("Invalid token. Please re-enter your token.");
         localStorage.removeItem('bloom_gh_token');
       }
     }
@@ -240,6 +288,8 @@ function switchMode(mode) {
   document.getElementById('modeLibraryBtn').classList.toggle('active', mode === 'library');
   document.getElementById('modeWishlistBtn').classList.toggle('active', mode === 'wishlist');
 
+  saveStateToHash();
+
   if (mode === 'library') render();
   else renderWishlist();
 }
@@ -260,6 +310,7 @@ function setFilter(filter) {
   document.querySelectorAll('#librarySection .filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.innerText.includes(filter) || (filter === 'All' && btn.innerText === 'All Books'));
   });
+  saveStateToHash();
   render();
 }
 
@@ -269,7 +320,80 @@ function setWishlistFilter(filter) {
   document.querySelectorAll('#wishlistSection .filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.innerText.includes(filter) || (filter === 'All' && btn.innerText === 'All Wishlist'));
   });
+  saveStateToHash();
   renderWishlist();
+}
+
+/* -------------------------------------------------------------
+   BOOK DETAIL POPUP MODAL (SINGLE ITEM VIEW)
+------------------------------------------------------------- */
+
+function openBookDetail(id, isWishlist = false) {
+  const modal = document.getElementById('bookDetailModal');
+  const coverContainer = document.getElementById('detailCoverContainer');
+  const notesLabel = document.getElementById('detailNotesLabel');
+  const editBtn = document.getElementById('detailEditBtn');
+  const deleteBtn = document.getElementById('detailDeleteBtn');
+
+  if (!isWishlist) {
+    const book = books.find(b => b.id === id);
+    if (!book) return;
+
+    coverContainer.innerHTML = book.cover 
+      ? `<img src="${book.cover}" alt="${escapeHtml(book.title)}" referrerpolicy="no-referrer">` 
+      : `<div class="cover-fallback">${escapeHtml(book.title)}</div>`;
+
+    const badge = document.getElementById('detailBadge');
+    badge.className = `book-badge badge-${book.status}`;
+    badge.innerText = book.status;
+
+    document.getElementById('detailTitle').innerText = book.title;
+    document.getElementById('detailAuthor').innerText = `by ${book.author}`;
+    document.getElementById('detailMeta').innerHTML = `
+      <span>📖 ${book.pages || 0} pages</span>
+      <span>📱 ${book.format || 'Physical'}</span>
+    `;
+
+    const stars = book.rating > 0 ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : 'Unrated';
+    document.getElementById('detailRating').innerText = stars;
+    notesLabel.innerText = "Thoughts & Notes";
+    document.getElementById('detailReview').innerText = book.review ? `"${book.review}"` : 'No thoughts or review recorded.';
+
+    editBtn.onclick = () => { closeDetailModal(); openEditModal(book.id); };
+    deleteBtn.onclick = () => { closeDetailModal(); deleteBook(book.id); };
+  } else {
+    const item = wishlist.find(w => w.id === id);
+    if (!item) return;
+
+    coverContainer.innerHTML = item.cover 
+      ? `<img src="${item.cover}" alt="${escapeHtml(item.title)}" referrerpolicy="no-referrer">` 
+      : `<div class="cover-fallback">${escapeHtml(item.title)}</div>`;
+
+    const badge = document.getElementById('detailBadge');
+    badge.className = `book-badge badge-${item.priority}`;
+    badge.innerText = `${item.priority} Priority`;
+
+    document.getElementById('detailTitle').innerText = item.title;
+    document.getElementById('detailAuthor').innerText = `by ${item.author}`;
+    document.getElementById('detailMeta').innerHTML = `
+      <span>💰 ${item.price ? item.price + ' EGP' : 'Price unset'}</span>
+      ${item.link ? `<span><a href="${item.link}" target="_blank" style="color:var(--accent-sage);text-decoration:underline;">Store Link ↗</a></span>` : ''}
+    `;
+
+    document.getElementById('detailRating').innerText = '';
+    notesLabel.innerText = "Wishlist Notes";
+    document.getElementById('detailReview').innerText = item.notes ? `"${item.notes}"` : 'No notes added.';
+
+    editBtn.onclick = () => { closeDetailModal(); openEditWishlistModal(item.id); };
+    deleteBtn.onclick = () => { closeDetailModal(); deleteWishlistBook(item.id); };
+  }
+
+  modal.classList.add('active');
+}
+
+function closeDetailModal() {
+  const modal = document.getElementById('bookDetailModal');
+  if (modal) modal.classList.remove('active');
 }
 
 /* -------------------------------------------------------------
@@ -287,8 +411,10 @@ function render() {
   if (libraryCurrentPage > totalPages) libraryCurrentPage = totalPages;
   if (libraryCurrentPage < 1) libraryCurrentPage = 1;
 
+  saveStateToHash();
+
   if (filteredBooks.length === 0) {
-    container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 3rem; color: var(--text-muted); font-style: italic;">No books found. Click "+ Add New Book" to begin.</div>`;
+    container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 3rem; color: var(--text-muted); font-style: italic;">No books found in this category. Click "+ Add New Book" to begin.</div>`;
     renderPagination('libraryPagination', 1, 1, (p) => { libraryCurrentPage = p; render(); });
     updateStats();
     return;
@@ -305,11 +431,9 @@ function render() {
 
     const card = document.createElement('div');
     card.className = 'book-card';
-    card.setAttribute('draggable', 'true');
     card.setAttribute('data-id', book.id);
 
     card.innerHTML = `
-      <div class="drag-handle">⋮⋮ Drag</div>
       <div class="book-cover-wrap">${coverHtml}</div>
       <div class="book-info">
         <span class="book-badge badge-${book.status}">${book.status}</span>
@@ -322,20 +446,23 @@ function render() {
         <div class="book-rating">${stars}</div>
         ${book.review ? `<p class="book-review">"${escapeHtml(book.review)}"</p>` : ''}
         <div class="card-actions">
-          <button class="action-btn edit" onclick="openEditModal(${book.id})">Edit</button>
-          <button class="action-btn delete" onclick="deleteBook(${book.id})">Remove</button>
+          <button class="action-btn edit" onclick="event.stopPropagation(); openEditModal(${book.id})">Edit</button>
+          <button class="action-btn delete" onclick="event.stopPropagation(); deleteBook(${book.id})">Remove</button>
         </div>
       </div>
     `;
 
-    addDragEvents(card);
+    // Clicking anywhere on card opens single detail view
+    card.onclick = () => openBookDetail(book.id, false);
+
     container.appendChild(card);
   });
 
   renderPagination('libraryPagination', libraryCurrentPage, totalPages, (p) => {
     libraryCurrentPage = p;
+    saveStateToHash();
     render();
-    window.scrollTo({ top: 300, behavior: 'smooth' });
+    window.scrollTo({ top: 280, behavior: 'smooth' });
   });
 
   updateStats();
@@ -351,6 +478,8 @@ function renderWishlist() {
 
   if (wishlistCurrentPage > totalPages) wishlistCurrentPage = totalPages;
   if (wishlistCurrentPage < 1) wishlistCurrentPage = 1;
+
+  saveStateToHash();
 
   if (filtered.length === 0) {
     container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 3rem; color: var(--text-muted); font-style: italic;">Your wishlist is empty. Add a book you want to buy!</div>`;
@@ -377,23 +506,27 @@ function renderWishlist() {
         <div class="book-author">by ${escapeHtml(item.author)}</div>
         <div class="book-details-list">
           <span>${item.price ? item.price + ' EGP' : 'Price unset'}</span>
-          ${item.link ? `<a href="${item.link}" target="_blank" style="color:var(--accent-sage); text-decoration:underline;">Store Link ↗</a>` : '<span></span>'}
+          ${item.link ? `<a href="${item.link}" target="_blank" onclick="event.stopPropagation();" style="color:var(--accent-sage); text-decoration:underline;">Store Link ↗</a>` : '<span></span>'}
         </div>
         ${item.notes ? `<p class="book-review">"${escapeHtml(item.notes)}"</p>` : ''}
         <div class="card-actions">
-          <button class="action-btn move-btn" onclick="moveToLibrary(${item.id})">✓ Bought It</button>
-          <button class="action-btn edit" onclick="openEditWishlistModal(${item.id})">Edit</button>
-          <button class="action-btn delete" onclick="deleteWishlistBook(${item.id})">Remove</button>
+          <button class="action-btn move-btn" onclick="event.stopPropagation(); moveToLibrary(${item.id})">✓ Bought It</button>
+          <button class="action-btn edit" onclick="event.stopPropagation(); openEditWishlistModal(${item.id})">Edit</button>
+          <button class="action-btn delete" onclick="event.stopPropagation(); deleteWishlistBook(${item.id})">Remove</button>
         </div>
       </div>
     `;
+
+    card.onclick = () => openBookDetail(item.id, true);
+
     container.appendChild(card);
   });
 
   renderPagination('wishlistPagination', wishlistCurrentPage, totalPages, (p) => {
     wishlistCurrentPage = p;
+    saveStateToHash();
     renderWishlist();
-    window.scrollTo({ top: 300, behavior: 'smooth' });
+    window.scrollTo({ top: 280, behavior: 'smooth' });
   });
 
   updateWishlistStats();
@@ -427,57 +560,6 @@ function renderPagination(containerId, currentPage, totalPages, onPageChange) {
   nextBtn.disabled = currentPage === totalPages;
   nextBtn.onclick = () => onPageChange(currentPage + 1);
   container.appendChild(nextBtn);
-}
-
-/* -------------------------------------------------------------
-   DRAG & DROP REORDERING
-------------------------------------------------------------- */
-
-function addDragEvents(card) {
-  card.addEventListener('dragstart', (e) => {
-    draggedBookId = Number(card.getAttribute('data-id'));
-    card.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', draggedBookId);
-  });
-
-  card.addEventListener('dragend', () => {
-    card.classList.remove('dragging');
-    document.querySelectorAll('.book-card').forEach(c => c.classList.remove('drag-over'));
-  });
-
-  card.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    card.classList.add('drag-over');
-  });
-
-  card.addEventListener('dragleave', () => {
-    card.classList.remove('drag-over');
-  });
-
-  card.addEventListener('drop', (e) => {
-    e.preventDefault();
-    card.classList.remove('drag-over');
-    const targetBookId = Number(card.getAttribute('data-id'));
-
-    if (draggedBookId && draggedBookId !== targetBookId) {
-      reorderBooks(draggedBookId, targetBookId);
-    }
-  });
-}
-
-function reorderBooks(sourceId, targetId) {
-  const sourceIndex = books.findIndex(b => b.id === sourceId);
-  const targetIndex = books.findIndex(b => b.id === targetId);
-
-  if (sourceIndex > -1 && targetIndex > -1) {
-    const [movedBook] = books.splice(sourceIndex, 1);
-    books.splice(targetIndex, 0, movedBook);
-    persistData();
-    syncToGitHub();
-    render();
-  }
 }
 
 /* -------------------------------------------------------------
@@ -542,7 +624,7 @@ function updateWishlistStats() {
 }
 
 /* -------------------------------------------------------------
-   BOOK OPERATIONS (ADD TO END)
+   BOOK OPERATIONS
 ------------------------------------------------------------- */
 
 function openModal() {
@@ -752,7 +834,7 @@ function moveToLibrary(id) {
     wishlist.splice(index, 1);
     persistData();
     syncToGitHub();
-    alert(`"${item.title}" added to the end of your Reading Library!`);
+    alert(`"${item.title}" added to your Reading Library!`);
     renderWishlist();
   }
 }
@@ -872,7 +954,7 @@ async function executeSearch(query, type, resultsContainerId) {
 
   resultsBox.innerHTML = '';
   if (itemsFound.length === 0) {
-    resultsBox.innerHTML = '<div class="search-status">No books found online. Please fill in details below manually!</div>';
+    resultsBox.innerHTML = '<div class="search-status">No books found online. Please fill in details manually!</div>';
     return;
   }
 
