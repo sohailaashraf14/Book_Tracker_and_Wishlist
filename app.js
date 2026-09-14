@@ -41,7 +41,7 @@ function loadStorageArray(key) {
 
 async function initializeApp() {
   try {
-    // 1. Force a fresh pull from GitHub with a timestamp parameter to break cache
+    // Force a fresh fetch from GitHub Pages with a timestamp to bust the browser cache
     const res = await fetch(`book-data.json?t=${Date.now()}`, { cache: 'no-store' });
     if (res.ok) {
       const remoteData = await res.json();
@@ -49,15 +49,15 @@ async function initializeApp() {
       wishlist = remoteData.wishlist || [];
       readingGoal = Number(remoteData.goal) || 25;
       
-      // Keep localStorage in sync as an offline backup
+      // Update local storage so it mirrors the fresh file
       persistData();
     } else {
       throw new Error(`HTTP error ${res.status}`);
     }
   } catch (err) {
-    console.warn("Could not load fresh book-data.json, trying local storage:", err);
+    console.warn("Could not load fresh book-data.json, checking local storage:", err);
     
-    // Fallback to local storage only if network fetch fails
+    // Fallback to local storage only if offline/network fails
     const localBooks = loadStorageArray('bloom_books');
     const localWish = loadStorageArray('bloom_wishlist');
     const localGoal = localStorage.getItem('bloom_goal');
