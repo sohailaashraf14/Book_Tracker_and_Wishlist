@@ -20,7 +20,7 @@ let libraryCurrentPage = 1;
 let wishlistCurrentPage = 1;
 
 /* -------------------------------------------------------------
-   URL HASH / STATE PRESERVATION ENGINE
+   URL HASH / STATE PERSISTENCE ENGINE
 ------------------------------------------------------------- */
 
 function saveStateToHash() {
@@ -107,7 +107,6 @@ async function initializeApp() {
     }
   }
 
-  // Update button classes to match current restored mode & filters
   document.getElementById('librarySection').style.display = (currentMode === 'library') ? 'block' : 'none';
   document.getElementById('wishlistSection').style.display = (currentMode === 'wishlist') ? 'block' : 'none';
   document.getElementById('modeLibraryBtn').classList.toggle('active', currentMode === 'library');
@@ -280,6 +279,23 @@ function handleImgError(imgElement, title) {
    NAVIGATION & FILTERS
 ------------------------------------------------------------- */
 
+function toggleMediaLinkInput(format) {
+  const group = document.getElementById('mediaLinkGroup');
+  const label = document.getElementById('mediaLinkLabel');
+  if (!group) return;
+
+  if (format === 'eBook') {
+    group.style.display = 'block';
+    label.innerText = '📖 eBook Link (PDF / ePub / Drive)';
+  } else if (format === 'Audiobook') {
+    group.style.display = 'block';
+    label.innerText = '🎧 Audiobook Link (Audible / Storytel / Drive)';
+  } else {
+    group.style.display = 'none';
+    document.getElementById('mediaLink').value = '';
+  }
+}
+
 function switchMode(mode) {
   currentMode = mode;
   document.getElementById('librarySection').style.display = (mode === 'library') ? 'block' : 'none';
@@ -325,7 +341,7 @@ function setWishlistFilter(filter) {
 }
 
 /* -------------------------------------------------------------
-   BOOK DETAIL POPUP MODAL (SINGLE ITEM VIEW)
+   BOOK DETAIL POPUP MODAL
 ------------------------------------------------------------- */
 
 function openBookDetail(id, isWishlist = false) {
@@ -349,9 +365,17 @@ function openBookDetail(id, isWishlist = false) {
 
     document.getElementById('detailTitle').innerText = book.title;
     document.getElementById('detailAuthor').innerText = `by ${book.author}`;
+
+    let mediaLinkHtml = '';
+    if (book.link && book.format !== 'Physical') {
+      const icon = book.format === 'Audiobook' ? '🎧 Listen to Audiobook' : '📖 Read eBook';
+      mediaLinkHtml = `<span><a href="${book.link}" target="_blank" rel="noopener noreferrer" class="media-link-tag">${icon} ↗</a></span>`;
+    }
+
     document.getElementById('detailMeta').innerHTML = `
       <span>📖 ${book.pages || 0} pages</span>
       <span>📱 ${book.format || 'Physical'}</span>
+      ${mediaLinkHtml}
     `;
 
     const stars = book.rating > 0 ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : 'Unrated';
@@ -377,7 +401,7 @@ function openBookDetail(id, isWishlist = false) {
     document.getElementById('detailAuthor').innerText = `by ${item.author}`;
     document.getElementById('detailMeta').innerHTML = `
       <span>💰 ${item.price ? item.price + ' EGP' : 'Price unset'}</span>
-      ${item.link ? `<span><a href="${item.link}" target="_blank" style="color:var(--accent-sage);text-decoration:underline;">Store Link ↗</a></span>` : ''}
+      ${item.link ? `<span><a href="${item.link}" target="_blank" style="color:var(--accent-sage); text-decoration:underline;">Store Link ↗</a></span>` : ''}
     `;
 
     document.getElementById('detailRating').innerText = '';
@@ -429,6 +453,10 @@ function render() {
       ? `<img src="${book.cover}" alt="${escapeHtml(book.title)}" referrerpolicy="no-referrer" onerror="handleImgError(this, '${escapeHtml(book.title)}')">` 
       : `<div class="cover-fallback">${escapeHtml(book.title)}</div>`;
 
+    const linkBadge = (book.link && book.format !== 'Physical') 
+      ? `<a href="${book.link}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="media-link-tag">${book.format === 'Audiobook' ? '🎧 Listen' : '📖 Read'} ↗</a>`
+      : `<span>${book.format || 'Physical'}</span>`;
+
     const card = document.createElement('div');
     card.className = 'book-card';
     card.setAttribute('data-id', book.id);
@@ -441,7 +469,7 @@ function render() {
         <div class="book-author">by ${escapeHtml(book.author)}</div>
         <div class="book-details-list">
           <span>${book.pages || 0} pages</span>
-          <span>${book.format || 'Physical'}</span>
+          ${linkBadge}
         </div>
         <div class="book-rating">${stars}</div>
         ${book.review ? `<p class="book-review">"${escapeHtml(book.review)}"</p>` : ''}
@@ -452,9 +480,7 @@ function render() {
       </div>
     `;
 
-    // Clicking anywhere on card opens single detail view
     card.onclick = () => openBookDetail(book.id, false);
-
     container.appendChild(card);
   });
 
@@ -518,7 +544,6 @@ function renderWishlist() {
     `;
 
     card.onclick = () => openBookDetail(item.id, true);
-
     container.appendChild(card);
   });
 
@@ -645,7 +670,12 @@ function openEditModal(id) {
   document.getElementById('author').value = book.author;
   document.getElementById('status').value = book.status;
   document.getElementById('pages').value = book.pages || '';
-  document.getElementById('format').value = book.format || 'Physical';
+  
+  const format = book.format || 'Physical';
+  document.getElementById('format').value = format;
+  toggleMediaLinkInput(format);
+  document.getElementById('mediaLink').value = book.link || '';
+
   document.getElementById('rating').value = book.rating || 0;
   document.getElementById('review').value = book.review || '';
   
@@ -666,6 +696,9 @@ function resetForm() {
   document.getElementById('title').value = '';
   document.getElementById('author').value = '';
   document.getElementById('pages').value = '';
+  document.getElementById('format').value = 'Physical';
+  document.getElementById('mediaLink').value = '';
+  toggleMediaLinkInput('Physical');
   document.getElementById('coverUrl').value = '';
   document.getElementById('coverFileInput').value = '';
   document.getElementById('review').value = '';
@@ -679,6 +712,7 @@ function saveBook() {
   const title = document.getElementById('title').value.trim();
   const author = document.getElementById('author').value.trim();
   const editId = document.getElementById('editBookId').value;
+  const formatVal = document.getElementById('format').value;
 
   if (!title || !author) {
     alert('Please provide both Title and Author.');
@@ -690,7 +724,8 @@ function saveBook() {
     author,
     status: document.getElementById('status').value,
     pages: Number(document.getElementById('pages').value) || 0,
-    format: document.getElementById('format').value,
+    format: formatVal,
+    link: (formatVal !== 'Physical') ? document.getElementById('mediaLink').value.trim() : '',
     rating: Number(document.getElementById('rating').value),
     cover: currentCoverData || document.getElementById('coverUrl').value.trim(),
     review: document.getElementById('review').value
@@ -827,6 +862,7 @@ function moveToLibrary(id) {
       status: 'To-Read',
       pages: 0,
       format: 'Physical',
+      link: '',
       rating: 0,
       cover: item.cover,
       review: item.notes ? `Purchased from wishlist: ${item.notes}` : ''
