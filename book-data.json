@@ -10,7 +10,8 @@
       "format": "Physical",
       "rating": 4,
       "cover": "https://cdn.aseeralkotb.com/storage/media/603766/conversions/%D9%82%D8%B6%D9%8A%D8%A9-%D8%B3%D8%AA-%D8%A7%D9%84%D8%AD%D8%B3%D9%86-%D8%AA%D8%AD%D9%82%D9%8A%D9%82%D8%A7%D8%AA-%D9%86%D9%88%D8%AD-%D8%A7%D9%84%D8%A3%D9%84%D9%81%D9%8A-1-18735-250x375-jpg.jpg",
-      "review": ""
+      "review": "",
+      "link": ""
     },
     {
       "id": 1789308072857,
@@ -144,7 +145,8 @@
       "format": "Physical",
       "rating": 0,
       "cover": "https://cdn.aseeralkotb.com/storage/media/460695/conversions/%D9%86%D8%B3%D8%A7%D8%A1-%D8%B5%D8%BA%D9%8A%D8%B1%D8%A7%D8%AA-16-50441-250x375-webp.webp",
-      "review": ""
+      "review": "",
+      "link": ""
     },
     {
       "id": 1789332063497,
@@ -912,6 +914,16 @@
       "price": 400,
       "link": "https://www.aseeralkotb.com/ar/books/%D8%A7%D9%84%D9%85%D8%B3%D8%AA%D8%A3%D8%AC%D8%B1%D8%A9-%D8%B7%D8%A8%D8%B9%D8%A9-%D9%85%D8%B5%D8%B1%D9%8A%D8%A9",
       "cover": "https://cdn.aseeralkotb.com/storage/media/614040/conversions/%D8%A7%D9%84%D9%85%D8%B3%D8%AA%D8%A3%D8%AC%D8%B1%D8%A9-%D8%B7%D8%A8%D8%B9%D8%A9-%D9%85%D8%B5%D8%B1%D9%8A%D8%A9-71657-250x375-webp.webp",
+      "notes": ""
+    },
+    {
+      "id": 1790361412450,
+      "title": "قضية السنوات السبع",
+      "author": "ميرنا المهدي",
+      "priority": "High",
+      "price": 0,
+      "link": "",
+      "cover": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR72_05PmfIR-WIN0ynMobjIMlUSaQbZRQVgxULuEEpEw&s=10",
       "notes": ""
     }
   ]
