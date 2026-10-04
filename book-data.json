@@ -498,11 +498,11 @@
       "id": 1790637771344,
       "title": "قضية السنوات السبع",
       "author": "ميرنا المهدي",
-      "status": "To-Read",
+      "status": "Finished",
       "pages": 352,
       "format": "Physical",
       "link": "",
-      "rating": 0,
+      "rating": 5,
       "cover": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR72_05PmfIR-WIN0ynMobjIMlUSaQbZRQVgxULuEEpEw&s=10",
       "review": ""
     }
@@ -926,16 +926,6 @@
       "price": 400,
       "link": "https://www.aseeralkotb.com/ar/books/%D8%A7%D9%84%D9%85%D8%B3%D8%AA%D8%A3%D8%AC%D8%B1%D8%A9-%D8%B7%D8%A8%D8%B9%D8%A9-%D9%85%D8%B5%D8%B1%D9%8A%D8%A9",
       "cover": "https://cdn.aseeralkotb.com/storage/media/614040/conversions/%D8%A7%D9%84%D9%85%D8%B3%D8%AA%D8%A3%D8%AC%D8%B1%D8%A9-%D8%B7%D8%A8%D8%B9%D8%A9-%D9%85%D8%B5%D8%B1%D9%8A%D8%A9-71657-250x375-webp.webp",
-      "notes": ""
-    },
-    {
-      "id": 1790711347795,
-      "title": "مغامرات بائع كتب نادرة",
-      "author": "أوليفر داركشاير",
-      "priority": "Medium",
-      "price": 320,
-      "link": "https://alkarmabooks.com/book/%D9%85%D8%BA%D8%A7%D9%85%D8%B1%D8%A7%D8%AA-%D8%A8%D8%A7%D8%A6%D8%B9-%D9%83%D8%AA%D8%A8-%D9%86%D8%A7%D8%AF%D8%B1%D8%A9",
-      "cover": "https://cc02fu17ufx0v59u.public.blob.vercel-storage.com/covers-sm/9789779603810.webp",
       "notes": ""
     }
   ]
