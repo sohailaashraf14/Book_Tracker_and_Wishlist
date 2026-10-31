@@ -555,6 +555,18 @@
       "rating": 0,
       "cover": "https://cdn.aseeralkotb.com/storage/media/264069/conversions/%D8%A8%D8%B9%D8%AF-%D8%AD%D9%84%D9%88%D9%84-%D8%A7%D9%84%D8%B8%D9%84%D8%A7%D9%85-1387-250x375-webp.webp",
       "review": ""
+    },
+    {
+      "id": 1793465406137,
+      "title": "جلسة علاجية",
+      "author": "سيباستيان فيتزيك",
+      "status": "To-Read",
+      "pages": 0,
+      "format": "Physical",
+      "link": "",
+      "rating": 0,
+      "cover": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRtQK1W5SWPdVYFl2JrNtef_PvvMi2eqwH63nzH4Dt6cg&s=10",
+      "review": ""
     }
   ],
   "wishlist": [
@@ -633,7 +645,7 @@
       "title": "بنات شاندونغ",
       "author": "إيف ج. تشونغ",
       "priority": "High",
-      "price": 366,
+      "price": 310,
       "link": "https://www.thebookhome.com/product/index/81767/%D8%A8%D9%86%D8%A7%D8%AA-%D8%B4%D8%A7%D9%86%D8%AF%D9%88%D9%86%D8%BA",
       "cover": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-54ZCbgHZAbhUsorADBPRXHH1dy7tm7ZuPDXD3FW2ZQ&s",
       "notes": ""
@@ -686,16 +698,6 @@
       "price": 469,
       "link": "https://www.thebookhome.com/product/index/71658/%D8%A7%D9%84%D9%85%D9%84%D9%83%D8%A9-%D8%A7%D9%84%D8%AD%D9%85%D8%B1%D8%A7%D8%A1-%D8%A3%D9%86%D8%B7%D9%88%D9%86%D9%8A%D8%A7-%D8%B3%D9%83%D9%88%D8%AA-1",
       "cover": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRBl3jd6-8UusL1Yz-wE_Z4XXuQrmII71UbaCLXJE-q6w&s=10",
-      "notes": ""
-    },
-    {
-      "id": 1789330151606,
-      "title": "جلسة علاجية",
-      "author": "سيباستيان فيتزيك",
-      "priority": "High",
-      "price": 310,
-      "link": "https://www.thebookhome.com/product/index/71393/%D8%AC%D9%84%D8%B3%D8%A9-%D8%B9%D9%84%D8%A7%D8%AC%D9%8A%D8%A9",
-      "cover": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRtQK1W5SWPdVYFl2JrNtef_PvvMi2eqwH63nzH4Dt6cg&s=10",
       "notes": ""
     },
     {
